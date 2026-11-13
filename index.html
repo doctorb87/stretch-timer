@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stretch Timer</title>
+<meta name="theme-color" content="#0f1417">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Stretch">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root{
+  --bg:#0f1417;--panel:#182025;--line:#26323a;--text:#e9eef0;--muted:#8a9aa3;
+  --stretch:#3ecf9a;--rest:#f2b84b;--final:#a78bfa;--ready:#6cb6ff;--accent:var(--stretch);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+body{min-height:100vh;transition:background .4s}
+[hidden]{display:none!important}
+.wrap{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:24px;margin:4px 0 4px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 18px;line-height:1.4}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.card h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0 0 10px;font-weight:600}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+input[type=text],input[type=number],select{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:16px;min-width:0;font-family:inherit}
+input[type=text]{flex:1}
+select{flex:0 0 auto;max-width:120px}
+.icon-btn{background:none;border:1px solid var(--line);color:var(--muted);border-radius:10px;width:42px;height:42px;font-size:20px;flex:0 0 auto;cursor:pointer}
+.add{background:none;border:1px dashed var(--line);color:var(--muted);border-radius:10px;padding:11px;width:100%;font-size:15px;cursor:pointer;margin-top:2px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+.field input{width:100%}
+.check{display:flex;align-items:center;gap:10px;font-size:15px;margin:4px 0 10px}
+.check input{width:20px;height:20px;accent-color:var(--stretch)}
+.toggles{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.toggles .check{margin:0}
+.summary{display:flex;justify-content:space-between;color:var(--muted);font-size:14px;margin:4px 2px 12px}
+.summary b{color:var(--text)}
+.primary{width:100%;background:var(--stretch);color:#062016;border:none;border-radius:14px;padding:17px;font-size:18px;font-weight:700;cursor:pointer}
+.ghost{background:none;border:1px solid var(--line);color:var(--text);border-radius:12px;padding:11px 14px;font-size:15px;cursor:pointer}
+.hint{color:var(--muted);font-size:13px;line-height:1.45;margin:12px 2px 0}
+
+/* Run screen */
+body.running{background:color-mix(in srgb,var(--accent) 10%,var(--bg))}
+.run{display:flex;flex-direction:column;align-items:center;text-align:center;min-height:100vh}
+.topline{width:100%;display:flex;justify-content:space-between;color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
+.bar{width:100%;height:5px;background:var(--line);border-radius:3px;margin:8px 0 22px;overflow:hidden}
+.bar div{height:100%;width:0;background:var(--accent);transition:width .2s linear}
+.phase{font-size:36px;font-weight:800;letter-spacing:.06em;color:var(--accent)}
+.what{font-size:21px;font-weight:600;margin-top:6px}
+.side{font-size:17px;color:var(--muted);min-height:22px;margin-top:2px}
+.ring{position:relative;width:min(72vw,280px);aspect-ratio:1;margin:18px 0 10px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:10}
+.ring .track{stroke:var(--line)}
+.ring .prog{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoffset .15s linear}
+.count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(56px,20vw,88px);font-weight:700;font-variant-numeric:tabular-nums}
+.roundinfo{font-size:18px;font-weight:600}
+.next{color:var(--muted);font-size:15px;margin-top:6px;min-height:20px}
+.controls{display:flex;gap:10px;margin-top:26px;width:100%}
+.controls button{flex:1;padding:15px 8px;font-size:16px;font-weight:600;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer}
+.controls #pauseBtn{flex:1.4;background:var(--accent);border-color:var(--accent);color:#0b1210}
+.controls #stopBtn.armed{background:#5a1f1f;border-color:#a33;color:#fff}
+.note{color:var(--muted);font-size:13px;margin-top:16px;line-height:1.4}
+.paused .count,.paused .phase{opacity:.45}
+
+.done{text-align:center;padding-top:18vh}
+.done .big{font-size:42px;font-weight:800;color:var(--stretch)}
+.done p{color:var(--muted);font-size:16px;margin:10px 0 28px}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<section id="setup">
+  <div class="wrap">
+    <h1>Stretch timer</h1>
+    <p class="sub">Voice and beep cues for every stretch, rest and side switch, so you don't need to look at the screen.</p>
+
+    <div class="card">
+      <h2>Stretches</h2>
+      <div id="list"></div>
+      <button class="add" id="addBtn">+ Add stretch</button>
+    </div>
+
+    <div class="card">
+      <h2>Timing (seconds)</h2>
+      <div class="grid">
+        <div class="field"><label for="f-stretch">Stretch</label><input id="f-stretch" type="number" inputmode="numeric" min="1"></div>
+        <div class="field"><label for="f-rest">Rest between rounds</label><input id="f-rest" type="number" inputmode="numeric" min="0"></div>
+        <div class="field"><label for="f-rounds">Rounds per side</label><input id="f-rounds" type="number" inputmode="numeric" min="1"></div>
+        <div class="field"><label for="f-change">Rest when switching</label><input id="f-change" type="number" inputmode="numeric" min="0"></div>
+        <div class="field"><label for="f-ready">Get-ready countdown</label><input id="f-ready" type="number" inputmode="numeric" min="0"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Final stretch</h2>
+      <label class="check"><input type="checkbox" id="f-finalOn"> Finish with one longer stretch</label>
+      <div class="row" id="finalRow">
+        <input type="text" id="f-finalName" placeholder="Name">
+        <input type="number" id="f-finalDur" inputmode="numeric" min="1" style="width:90px" aria-label="Final stretch seconds">
+        <span style="color:var(--muted);font-size:14px">sec</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Sound</h2>
+      <div class="toggles">
+        <label class="check"><input type="checkbox" id="f-voice"> Voice</label>
+        <label class="check"><input type="checkbox" id="f-beeps"> Beeps</label>
+        <button class="ghost" id="testBtn" style="margin-left:auto">Test sound</button>
+      </div>
+    </div>
+
+    <div class="summary"><span id="sumSets"></span><span>Total <b id="sumTime"></b></span></div>
+    <button class="primary" id="startBtn">Start</button>
+    <p class="hint">Turn your volume up and keep the screen on (the timer tries to stop it locking). If your phone locks, the cues may pause. Your routine is remembered on this device.</p>
+  </div>
+</section>
+
+<!-- RUNNING -->
+<section id="run" hidden>
+  <div class="wrap run" id="runWrap">
+    <div class="topline"><span id="setInfo"></span><span id="leftInfo"></span></div>
+    <div class="bar"><div id="barFill"></div></div>
+    <div class="phase" id="phase"></div>
+    <div class="what" id="what"></div>
+    <div class="side" id="side"></div>
+    <div class="ring">
+      <svg viewBox="0 0 260 260"><circle class="track" cx="130" cy="130" r="120"/><circle class="prog" id="prog" cx="130" cy="130" r="120"/></svg>
+      <div class="count" id="count"></div>
+    </div>
+    <div class="roundinfo" id="roundInfo"></div>
+    <div class="next" id="nextInfo"></div>
+    <div class="controls">
+      <button id="pauseBtn">Pause</button>
+      <button id="skipBtn">Skip</button>
+      <button id="stopBtn">Stop</button>
+    </div>
+    <div class="note" id="wakeNote"></div>
+  </div>
+</section>
+
+<!-- DONE -->
+<section id="done" hidden>
+  <div class="wrap done">
+    <div class="big">All done</div>
+    <p id="doneText"></p>
+    <button class="primary" id="backBtn">Back to routine</button>
+  </div>
+</section>
+
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const KEY = 'stretchTimerCfg.v1';
+const SIDE_OPTS = [['leg','Each leg'],['arm','Each arm'],['side','Each side'],['none','No sides']];
+const DEFAULTS = {
+  stretches:[
+    {name:'Hamstring stretch',sides:'leg'},
+    {name:'Quad stretch',sides:'leg'},
+    {name:'Calf stretch',sides:'leg'}
+  ],
+  stretch:30, rest:10, rounds:4, change:10, ready:5,
+  finalOn:true, finalName:'Final stretch', finalDur:120,
+  voice:true, beeps:true
+};
+
+/* ---------- config ---------- */
+function clone(o){return JSON.parse(JSON.stringify(o));}
+function load(){
+  try{
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if(s && Array.isArray(s.stretches)) return Object.assign(clone(DEFAULTS), s);
+  }catch(e){}
+  return clone(DEFAULTS);
+}
+function save(){try{localStorage.setItem(KEY, JSON.stringify(cfg));}catch(e){}}
+let cfg = load();
+
+const NUMS = {stretch:1, rest:0, rounds:1, change:0, ready:0, finalDur:1};
+function int(v, min){v = parseInt(v,10); return isNaN(v) ? min : Math.max(min, v);}
+
+/* ---------- setup UI ---------- */
+function renderList(){
+  const box = $('#list'); box.innerHTML = '';
+  cfg.stretches.forEach((s,i) => {
+    const row = document.createElement('div'); row.className = 'row';
+    const inp = document.createElement('input'); inp.type='text'; inp.value=s.name; inp.placeholder='Stretch name';
+    inp.oninput = () => {s.name = inp.value; changed();};
+    const sel = document.createElement('select');
+    SIDE_OPTS.forEach(([v,t]) => {const o=document.createElement('option'); o.value=v; o.textContent=t; sel.appendChild(o);});
+    sel.value = s.sides; sel.onchange = () => {s.sides = sel.value; changed();};
+    const del = document.createElement('button'); del.className='icon-btn'; del.textContent='×'; del.setAttribute('aria-label','Remove stretch');
+    del.onclick = () => {cfg.stretches.splice(i,1); renderList(); changed();};
+    row.append(inp, sel, del); box.appendChild(row);
+  });
+}
+function bindFields(){
+  Object.keys(NUMS).forEach(k => {
+    const el = $('#f-'+k); el.value = cfg[k];
+    el.oninput = () => {cfg[k] = int(el.value, NUMS[k]); changed();};
+    el.onblur = () => {el.value = cfg[k];};
+  });
+  ['finalOn','voice','beeps'].forEach(k => {
+    const el = $('#f-'+k); el.checked = !!cfg[k];
+    el.onchange = () => {cfg[k] = el.checked; changed();};
+  });
+  const fn = $('#f-finalName'); fn.value = cfg.finalName;
+  fn.oninput = () => {cfg.finalName = fn.value; changed();};
+}
+function changed(){
+  save();
+  $('#finalRow').style.opacity = cfg.finalOn ? 1 : .4;
+  const steps = buildSteps();
+  const sets = countSets();
+  $('#sumSets').textContent = sets + (sets===1 ? ' set' : ' sets');
+  $('#sumTime').textContent = fmtClock(steps.reduce((a,s)=>a+s.dur,0));
+  $('#startBtn').disabled = !steps.length;
+  $('#startBtn').style.opacity = steps.length ? 1 : .5;
+}
+$('#addBtn').onclick = () => {cfg.stretches.push({name:'', sides:'leg'}); renderList(); changed(); const ins=$('#list').querySelectorAll('input'); ins[ins.length-1].focus();};
+
+/* ---------- sequence ---------- */
+function blocks(){
+  const out = [];
+  cfg.stretches.forEach(s => {
+    const name = (s.name||'').trim() || 'Stretch';
+    if(s.sides === 'none') out.push({name, side:''});
+    else { out.push({name, side:'Left '+s.sides}); out.push({name, side:'Right '+s.sides}); }
+  });
+  return out;
+}
+function finalBlock(){ return cfg.finalOn && cfg.finalDur > 0 ? {name:(cfg.finalName||'').trim()||'Final stretch', side:'', final:true} : null; }
+function countSets(){ return blocks().length + (finalBlock()?1:0); }
+function label(b){ return b.side ? b.name + ', ' + b.side.toLowerCase() : b.name; }
+
+function buildSteps(){
+  const bl = blocks(), fb = finalBlock(), N = Math.max(1, cfg.rounds);
+  const steps = [];
+  if(!bl.length && !fb) return steps;
+  steps.push({type:'ready', dur:cfg.ready, next: bl[0] || fb});
+  bl.forEach((b, bi) => {
+    for(let r=1; r<=N; r++){
+      steps.push({type:'stretch', dur:cfg.stretch, block:b, round:r, rounds:N, set:bi});
+      if(r < N) steps.push({type:'rest', dur:cfg.rest, block:b, set:bi});
+      else {
+        const nb = bl[bi+1] || fb;
+        if(nb) steps.push({type:'change', dur:cfg.change, block:b, next:nb, set:bi});
+      }
+    }
+  });
+  if(fb) steps.push({type:'final', dur:cfg.finalDur, block:fb, set:bl.length});
+  return steps.filter(s => s.dur > 0);
+}
+
+/* ---------- formatting ---------- */
+function fmtClock(s){ s=Math.max(0,Math.round(s)); const m=Math.floor(s/60), r=s%60; return m + ':' + String(r).padStart(2,'0'); }
+function fmtSpeak(s){
+  const m=Math.floor(s/60), r=s%60, p=[];
+  if(m) p.push(m + (m===1?' minute':' minutes'));
+  if(r) p.push(r + (r===1?' second':' seconds'));
+  return p.join(' ') || '0 seconds';
+}
+
+/* ---------- audio ---------- */
+let ac = null;
+function ensureAudio(){
+  try{
+    if(!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+    if(ac.state === 'suspended') ac.resume();
+  }catch(e){}
+}
+function tone(freq, at, dur, vol, type){
+  if(!ac || !cfg.beeps) return;
+  try{
+    const t = ac.currentTime + at, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.4, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + dur + 0.05);
+  }catch(e){}
+}
+const SND = {
+  tick:  () => tone(988, 0, 0.12, 0.35, 'triangle'),
+  go:    () => { tone(784, 0, 0.18, 0.45); tone(1175, 0.16, 0.45, 0.45); },
+  rest:  () => { tone(523, 0, 0.5, 0.4); },
+  change:() => { tone(659, 0, 0.18, 0.4); tone(523, 0.2, 0.45, 0.4); },
+  done:  () => { [523,659,784,1047].forEach((f,i)=>tone(f, i*0.16, i===3?0.9:0.25, 0.4)); }
+};
+
+let voice = null;
+function pickVoice(){
+  try{
+    const vs = speechSynthesis.getVoices();
+    voice = vs.find(v=>/en[-_]GB/i.test(v.lang)) || vs.find(v=>/^en/i.test(v.lang)) || null;
+  }catch(e){}
+}
+const hasSpeech = 'speechSynthesis' in window;
+if(hasSpeech){ pickVoice(); try{ speechSynthesis.onvoiceschanged = pickVoice; }catch(e){} }
+function say(text, delay){
+  if(!cfg.voice || !hasSpeech || !text) return;
+  const go = () => {
+    try{
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      if(voice) u.voice = voice;
+      u.lang = voice ? voice.lang : 'en-GB';
+      u.rate = 1;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  };
+  delay ? setTimeout(go, delay) : go();
+}
+function unlockSpeech(){
+  if(!hasSpeech) return;
+  try{ const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); }catch(e){}
+}
+
+$('#testBtn').onclick = () => {
+  ensureAudio(); SND.go();
+  if(cfg.voice) say('Sound check. This is how your cues will sound.', 450);
+};
+
+/* ---------- wake lock ---------- */
+let wake = null;
+async function requestWake(){
+  const note = $('#wakeNote');
+  try{
+    if(!('wakeLock' in navigator)) throw 0;
+    wake = await navigator.wakeLock.request('screen');
+    note.textContent = 'Screen will stay on while the timer runs.';
+  }catch(e){
+    wake = null;
+    note.textContent = 'Keep your screen on – cues may stop if your phone locks.';
+  }
+}
+function releaseWake(){ try{ wake && wake.release(); }catch(e){} wake = null; }
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && run && !run.paused) requestWake();
+});
+
+/* ---------- runner ---------- */
+let run = null, loop = null;
+const CIRC = 2 * Math.PI * 120;
+$('#prog').style.strokeDasharray = CIRC;
+
+function show(id){
+  ['setup','run','done'].forEach(s => $('#'+s).hidden = (s !== id));
+  document.body.classList.toggle('running', id === 'run');
+  window.scrollTo(0,0);
+}
+
+function start(){
+  const steps = buildSteps(); if(!steps.length) return;
+  ensureAudio(); unlockSpeech();
+  run = {steps, i:-1, end:performance.now(), paused:false, lastSec:null, remain:0, total:steps.reduce((a,s)=>a+s.dur,0)};
+  show('run'); requestWake();
+  disarmStop(); $('#pauseBtn').textContent = 'Pause'; $('#runWrap').classList.remove('paused');
+  advance(true);
+  clearInterval(loop); loop = setInterval(tick, 100);
+}
+
+function advance(fromTimer){
+  run.i++;
+  if(run.i >= run.steps.length){ finish(); return; }
+  const st = run.steps[run.i];
+  run.end = (fromTimer ? run.end : performance.now()) + st.dur * 1000;
+  run.lastSec = st.dur;
+  cueStart(st, run.steps[run.i-1]);
+  paint();
+}
+
+function tick(){
+  if(!run || run.paused) return;
+  let rem = run.end - performance.now(), guard = 0;
+  while(rem <= 0 && guard++ < 100){ advance(true); if(!run) return; rem = run.end - performance.now(); }
+  const sec = Math.ceil(rem / 1000);
+  if(sec !== run.lastSec){ run.lastSec = sec; cueSecond(run.steps[run.i], sec); }
+  paint(rem);
+}
+
+function cueStart(st, prev){
+  const b = st.block;
+  const announced = prev && (prev.type === 'ready' || prev.type === 'change');
+  switch(st.type){
+    case 'ready': {
+      SND.tick();
+      const n = st.next;
+      say(n.final ? 'Get ready. ' + n.name + ', ' + fmtSpeak(cfg.finalDur) + '.' : 'Get ready. First, ' + label(n) + '.');
+      break;
+    }
+    case 'stretch': {
+      SND.go();
+      let t;
+      if(st.rounds === 1) t = 'Stretch.';
+      else if(st.round === 1) t = 'Stretch. Round 1 of ' + st.rounds + '.';
+      else if(st.round === st.rounds) t = 'Last round.';
+      else t = 'Round ' + st.round + '.';
+      if(st.round === 1 && !announced) t = label(b) + '. ' + t;
+      say(t, 400);
+      break;
+    }
+    case 'rest':
+      SND.rest(); say('Rest.', 550);
+      break;
+    case 'change': {
+      SND.change();
+      const n = st.next; let t;
+      if(n.final) t = 'Rest. Last one: ' + n.name + ', ' + fmtSpeak(cfg.finalDur) + '.';
+      else if(n.name === b.name && n.side) t = 'Rest. Switch to ' + n.side.toLowerCase() + '.';
+      else t = 'Rest. Next, ' + label(n) + '.';
+      say(t, 650);
+      break;
+    }
+    case 'final':
+      SND.go();
+      say((announced ? '' : b.name + '. ') + 'Go. ' + fmtSpeak(st.dur) + '.', 400);
+      break;
+  }
+}
+
+function cueSecond(st, sec){
+  if(sec <= 0) return;
+  if(sec <= 3 && st.dur >= 5) SND.tick();
+  if(st.type === 'stretch' || st.type === 'final'){
+    if(st.dur > 60 && sec % 60 === 0 && sec < st.dur) say(sec === 60 ? 'One minute left.' : (sec/60) + ' minutes left.');
+    else if(st.dur >= 60 && sec === 30) say('30 seconds.');
+    else if(st.dur >= 60 && sec === 10) say('10 seconds.');
+  }
+}
+
+function nextText(i){
+  const st = run.steps[i];
+  for(let j=i+1; j<run.steps.length; j++){
+    const s = run.steps[j];
+    if(s.type === 'stretch'){
+      if(st.block && s.block === st.block) return 'Up next: round ' + s.round + ' of ' + s.rounds;
+      return 'Up next: ' + s.block.name + (s.block.side ? ' (' + s.block.side.toLowerCase() + ')' : '');
+    }
+    if(s.type === 'final') return 'Up next: ' + s.block.name + ' (' + fmtClock(s.dur) + ')';
+  }
+  return 'Up next: finish';
+}
+
+const COLORS = {ready:'--ready', stretch:'--stretch', rest:'--rest', change:'--rest', final:'--final'};
+let paintedStep = -1;
+function paint(rem){
+  const st = run.steps[run.i];
+  if(rem === undefined) rem = run.paused ? run.remain : run.end - performance.now();
+  rem = Math.max(0, rem);
+
+  if(paintedStep !== run.i){
+    paintedStep = run.i;
+    document.documentElement.style.setProperty('--accent', 'var(' + COLORS[st.type] + ')');
+    const b = st.block || st.next;
+    let phase, what = b.name, side = b.side || '', round = '';
+    switch(st.type){
+      case 'ready': phase = 'GET READY'; break;
+      case 'stretch': phase = 'STRETCH'; round = 'Round ' + st.round + ' of ' + st.rounds; break;
+      case 'rest': phase = 'REST'; break;
+      case 'change':
+        phase = (st.next.name === st.block.name && !st.next.final) ? 'SWITCH SIDES' : 'REST';
+        what = st.next.name; side = st.next.side || ''; break;
+      case 'final': phase = 'FINAL STRETCH'; side = ''; break;
+    }
+    if(st.type === 'rest'){
+      const nx = run.steps.slice(run.i+1).find(s=>s.type==='stretch');
+      round = nx ? 'Next: round ' + nx.round + ' of ' + nx.rounds : '';
+    }
+    if(st.type === 'ready' || st.type === 'change') round = st.next.final ? 'Up next · ' + fmtClock(cfg.finalDur) + ' hold' : 'Up next';
+    $('#phase').textContent = phase;
+    $('#what').textContent = what;
+    $('#side').textContent = side;
+    $('#roundInfo').textContent = round;
+    $('#nextInfo').textContent = (st.type === 'rest' || st.type === 'change' || st.type === 'ready') ? '' : nextText(run.i);
+    const sets = countSetsIn(run.steps);
+    $('#setInfo').textContent = 'Set ' + Math.min(sets, (st.set === undefined ? 0 : st.set) + 1) + ' of ' + sets;
+  }
+
+  const sec = Math.ceil(rem/1000);
+  $('#count').textContent = sec >= 60 ? fmtClock(sec) : sec;
+  $('#prog').style.strokeDashoffset = CIRC * (1 - rem / (st.dur*1000));
+  let later = 0; for(let j=run.i+1; j<run.steps.length; j++) later += run.steps[j].dur;
+  const left = rem/1000 + later;
+  $('#leftInfo').textContent = fmtClock(Math.ceil(left)) + ' left';
+  $('#barFill').style.width = (100 * (1 - left / run.total)) + '%';
+}
+function countSetsIn(steps){ const s = new Set(); steps.forEach(x => { if(x.set !== undefined) s.add(x.set); }); return Math.max(1, s.size); }
+
+function finish(){
+  clearInterval(loop); loop = null;
+  SND.done(); say('All done. Well done!', 300);
+  $('#doneText').textContent = 'You stretched for ' + fmtClock(run.total) + '.';
+  run = null; paintedStep = -1; releaseWake();
+  document.documentElement.style.setProperty('--accent', 'var(--stretch)');
+  show('done');
+}
+
+$('#pauseBtn').onclick = () => {
+  if(!run) return;
+  ensureAudio();
+  if(!run.paused){
+    run.paused = true; run.remain = Math.max(0, run.end - performance.now());
+    $('#pauseBtn').textContent = 'Resume'; $('#runWrap').classList.add('paused');
+    say('Paused.');
+  }else{
+    run.paused = false; run.end = performance.now() + run.remain;
+    $('#pauseBtn').textContent = 'Pause'; $('#runWrap').classList.remove('paused');
+    say('Resuming.'); requestWake();
+  }
+};
+$('#skipBtn').onclick = () => {
+  if(!run) return;
+  ensureAudio();
+  if(run.paused){ run.paused = false; $('#pauseBtn').textContent = 'Pause'; $('#runWrap').classList.remove('paused'); }
+  advance(false);
+};
+let stopTimer = null;
+function disarmStop(){ clearTimeout(stopTimer); const b=$('#stopBtn'); b.classList.remove('armed'); b.textContent='Stop'; }
+$('#stopBtn').onclick = () => {
+  const b = $('#stopBtn');
+  if(!b.classList.contains('armed')){
+    b.classList.add('armed'); b.textContent = 'Tap to confirm';
+    stopTimer = setTimeout(disarmStop, 3000); return;
+  }
+  disarmStop();
+  clearInterval(loop); loop = null; run = null; paintedStep = -1;
+  try{ speechSynthesis.cancel(); }catch(e){}
+  releaseWake();
+  document.documentElement.style.setProperty('--accent', 'var(--stretch)');
+  show('setup');
+};
+$('#startBtn').onclick = start;
+$('#backBtn').onclick = () => show('setup');
+
+/* ---------- init ---------- */
+renderList(); bindFields(); changed();
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+})();
+</script>
+</body>
+</html>
