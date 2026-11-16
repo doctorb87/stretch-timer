@@ -99,13 +99,10 @@ body.running{background:color-mix(in srgb,var(--accent) 10%,var(--bg))}
     </div>
 
     <div class="card">
-      <h2>Final stretch</h2>
-      <label class="check"><input type="checkbox" id="f-finalOn"> Finish with one longer stretch</label>
-      <div class="row" id="finalRow">
-        <input type="text" id="f-finalName" placeholder="Name">
-        <input type="number" id="f-finalDur" inputmode="numeric" min="1" style="width:90px" aria-label="Final stretch seconds">
-        <span style="color:var(--muted);font-size:14px">sec</span>
-      </div>
+      <h2>Final stretches</h2>
+      <label class="check"><input type="checkbox" id="f-finalOn"> Finish with longer stretches</label>
+      <div id="finalList"></div>
+      <button class="add" id="addFinalBtn">+ Add final stretch</button>
     </div>
 
     <div class="card">
@@ -167,7 +164,7 @@ const DEFAULTS = {
     {name:'Calf stretch',sides:'leg'}
   ],
   stretch:30, rest:10, rounds:4, change:10, ready:5,
-  finalOn:true, finalName:'Final stretch', finalDur:120,
+  finalOn:true, finals:[{name:'Final stretch 1',dur:120},{name:'Final stretch 2',dur:120}],
   voice:true, beeps:true
 };
 
@@ -176,14 +173,21 @@ function clone(o){return JSON.parse(JSON.stringify(o));}
 function load(){
   try{
     const s = JSON.parse(localStorage.getItem(KEY));
-    if(s && Array.isArray(s.stretches)) return Object.assign(clone(DEFAULTS), s);
+    if(s && Array.isArray(s.stretches)){
+      if(!Array.isArray(s.finals)){
+        // older version had a single final stretch: keep it and add a second
+        s.finals = [{name:(s.finalName||'Final stretch 1'), dur:(s.finalDur||120)}, {name:'Final stretch 2', dur:120}];
+        delete s.finalName; delete s.finalDur;
+      }
+      return Object.assign(clone(DEFAULTS), s);
+    }
   }catch(e){}
   return clone(DEFAULTS);
 }
 function save(){try{localStorage.setItem(KEY, JSON.stringify(cfg));}catch(e){}}
 let cfg = load();
 
-const NUMS = {stretch:1, rest:0, rounds:1, change:0, ready:0, finalDur:1};
+const NUMS = {stretch:1, rest:0, rounds:1, change:0, ready:0};
 function int(v, min){v = parseInt(v,10); return isNaN(v) ? min : Math.max(min, v);}
 
 /* ---------- setup UI ---------- */
@@ -201,6 +205,23 @@ function renderList(){
     row.append(inp, sel, del); box.appendChild(row);
   });
 }
+function renderFinals(){
+  const box = $('#finalList'); box.innerHTML = '';
+  cfg.finals.forEach((f,i) => {
+    const row = document.createElement('div'); row.className = 'row';
+    const inp = document.createElement('input'); inp.type='text'; inp.value=f.name; inp.placeholder='Name';
+    inp.oninput = () => {f.name = inp.value; changed();};
+    const sec = document.createElement('input'); sec.type='number'; sec.inputMode='numeric'; sec.min='1'; sec.value=f.dur;
+    sec.style.width='80px'; sec.setAttribute('aria-label','Seconds');
+    sec.oninput = () => {f.dur = int(sec.value, 1); changed();};
+    sec.onblur = () => {sec.value = f.dur;};
+    const unit = document.createElement('span'); unit.textContent='sec'; unit.style.cssText='color:var(--muted);font-size:14px';
+    const del = document.createElement('button'); del.className='icon-btn'; del.textContent='×'; del.setAttribute('aria-label','Remove final stretch');
+    del.onclick = () => {cfg.finals.splice(i,1); renderFinals(); changed();};
+    row.append(inp, sec, unit, del); box.appendChild(row);
+  });
+}
+$('#addFinalBtn').onclick = () => {cfg.finals.push({name:'Final stretch ' + (cfg.finals.length+1), dur:120}); renderFinals(); changed();};
 function bindFields(){
   Object.keys(NUMS).forEach(k => {
     const el = $('#f-'+k); el.value = cfg[k];
@@ -211,12 +232,11 @@ function bindFields(){
     const el = $('#f-'+k); el.checked = !!cfg[k];
     el.onchange = () => {cfg[k] = el.checked; changed();};
   });
-  const fn = $('#f-finalName'); fn.value = cfg.finalName;
-  fn.oninput = () => {cfg.finalName = fn.value; changed();};
+
 }
 function changed(){
   save();
-  $('#finalRow').style.opacity = cfg.finalOn ? 1 : .4;
+  $('#finalList').style.opacity = $('#addFinalBtn').style.opacity = cfg.finalOn ? 1 : .4;
   const steps = buildSteps();
   const sets = countSets();
   $('#sumSets').textContent = sets + (sets===1 ? ' set' : ' sets');
@@ -236,12 +256,17 @@ function blocks(){
   });
   return out;
 }
-function finalBlock(){ return cfg.finalOn && cfg.finalDur > 0 ? {name:(cfg.finalName||'').trim()||'Final stretch', side:'', final:true} : null; }
-function countSets(){ return blocks().length + (finalBlock()?1:0); }
+function finalBlocks(){
+  if(!cfg.finalOn) return [];
+  const fs = cfg.finals.filter(f => f.dur > 0).map(f => ({name:(f.name||'').trim()||'Final stretch', side:'', final:true, dur:f.dur}));
+  if(fs.length) fs[fs.length-1].last = true;
+  return fs;
+}
+function countSets(){ return blocks().length + finalBlocks().length; }
 function label(b){ return b.side ? b.name + ', ' + b.side.toLowerCase() : b.name; }
 
 function buildSteps(){
-  const bl = blocks(), fb = finalBlock(), N = Math.max(1, cfg.rounds);
+  const bl = blocks(), fbs = finalBlocks(), fb = fbs[0], N = Math.max(1, cfg.rounds);
   const steps = [];
   if(!bl.length && !fb) return steps;
   steps.push({type:'ready', dur:cfg.ready, next: bl[0] || fb});
@@ -255,7 +280,10 @@ function buildSteps(){
       }
     }
   });
-  if(fb) steps.push({type:'final', dur:cfg.finalDur, block:fb, set:bl.length});
+  fbs.forEach((f, fi) => {
+    steps.push({type:'final', dur:f.dur, block:f, set:bl.length + fi, idx:fi + 1, of:fbs.length});
+    if(fbs[fi+1]) steps.push({type:'change', dur:cfg.change, block:f, next:fbs[fi+1], set:bl.length + fi});
+  });
   return steps.filter(s => s.dur > 0);
 }
 
@@ -393,7 +421,7 @@ function cueStart(st, prev){
     case 'ready': {
       SND.tick();
       const n = st.next;
-      say(n.final ? 'Get ready. ' + n.name + ', ' + fmtSpeak(cfg.finalDur) + '.' : 'Get ready. First, ' + label(n) + '.');
+      say(n.final ? 'Get ready. ' + n.name + ', ' + fmtSpeak(n.dur) + '.' : 'Get ready. First, ' + label(n) + '.');
       break;
     }
     case 'stretch': {
@@ -413,7 +441,7 @@ function cueStart(st, prev){
     case 'change': {
       SND.change();
       const n = st.next; let t;
-      if(n.final) t = 'Rest. Last one: ' + n.name + ', ' + fmtSpeak(cfg.finalDur) + '.';
+      if(n.final) t = 'Rest. ' + (n.last ? 'Last one: ' : 'Next, ') + n.name + ', ' + fmtSpeak(n.dur) + '.';
       else if(n.name === b.name && n.side) t = 'Rest. Switch to ' + n.side.toLowerCase() + '.';
       else t = 'Rest. Next, ' + label(n) + '.';
       say(t, 650);
@@ -468,13 +496,13 @@ function paint(rem){
       case 'change':
         phase = (st.next.name === st.block.name && !st.next.final) ? 'SWITCH SIDES' : 'REST';
         what = st.next.name; side = st.next.side || ''; break;
-      case 'final': phase = 'FINAL STRETCH'; side = ''; break;
+      case 'final': phase = 'FINAL STRETCH'; side = ''; round = st.of > 1 ? st.idx + ' of ' + st.of : ''; break;
     }
     if(st.type === 'rest'){
       const nx = run.steps.slice(run.i+1).find(s=>s.type==='stretch');
       round = nx ? 'Next: round ' + nx.round + ' of ' + nx.rounds : '';
     }
-    if(st.type === 'ready' || st.type === 'change') round = st.next.final ? 'Up next · ' + fmtClock(cfg.finalDur) + ' hold' : 'Up next';
+    if(st.type === 'ready' || st.type === 'change') round = st.next.final ? 'Up next · ' + fmtClock(st.next.dur) + ' hold' : 'Up next';
     $('#phase').textContent = phase;
     $('#what').textContent = what;
     $('#side').textContent = side;
@@ -541,7 +569,7 @@ $('#startBtn').onclick = start;
 $('#backBtn').onclick = () => show('setup');
 
 /* ---------- init ---------- */
-renderList(); bindFields(); changed();
+renderList(); renderFinals(); bindFields(); changed();
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(()=>{}); });
 }

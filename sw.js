@@ -1,5 +1,5 @@
 // Offline support: serve from cache, refresh in the background.
-const CACHE = 'stretch-timer-v1';
+const CACHE = 'stretch-timer-v2';
 const FILES = [
   './',
   './index.html',
