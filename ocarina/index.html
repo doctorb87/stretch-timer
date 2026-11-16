@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ocarina Songs</title>
+<meta name="theme-color" content="#10241c">
+<meta name="description" content="Ocarina of Time remake song inputs with Xbox buttons.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root{
+    --bg:#10241c; --card:#173328; --card2:#1d3d31; --ink:#eef3ea; --muted:#a8bcae;
+    --gold:#e8c35a; --line:#2a4a3d;
+    --a:#5dbb3f; --b:#e0453a; --x:#3a7fe0; --y:#f0c419;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+  header{position:sticky;top:0;z-index:2;background:var(--bg);
+    padding:calc(14px + env(safe-area-inset-top)) 16px 10px;border-bottom:1px solid var(--line)}
+  h1{margin:0 0 10px;font-size:20px;letter-spacing:.2px;display:flex;align-items:center;gap:8px}
+  h1 .tri{color:var(--gold)}
+  .row{display:flex;gap:8px}
+  input[type=search]{flex:1;min-width:0;background:var(--card);color:var(--ink);border:1px solid var(--line);
+    border-radius:12px;padding:11px 12px;font-size:16px;outline:none}
+  input[type=search]:focus{border-color:var(--gold)}
+  .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .seg button{background:none;border:0;color:var(--muted);padding:0 12px;font-size:14px;font-weight:600}
+  .seg button.on{background:var(--gold);color:#1b1b10}
+  main{padding:8px 12px calc(24px + env(safe-area-inset-bottom))}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin:18px 6px 8px}
+  .song{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:0 0 8px;overflow:hidden}
+  .song summary{list-style:none;padding:12px 14px;cursor:pointer}
+  .song summary::-webkit-details-marker{display:none}
+  .name{font-weight:650;font-size:16px;margin-bottom:8px;display:flex;justify-content:space-between}
+  .name .chev{color:var(--muted);transition:transform .2s}
+  .song[open] .chev{transform:rotate(90deg)}
+  .keys{display:flex;flex-wrap:wrap;gap:6px}
+  .k{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;
+    font-weight:800;font-size:15px;color:#fff;box-shadow:inset 0 -3px 0 rgba(0,0,0,.25)}
+  .k.A{background:var(--a)} .k.B{background:var(--b)} .k.X{background:var(--x)} .k.Y{background:var(--y);color:#2b2300}
+  .k.bump{width:44px;border-radius:10px;background:#4a5550;font-size:13px}
+  .k.sw{background:#33433c}
+  .k.sw.A,.k.sw.B,.k.sw.X,.k.sw.Y{color:#fff}
+  .info{padding:0 14px 14px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);background:var(--card2)}
+  .info p{margin:10px 0 0}
+  .info b{color:var(--ink);font-weight:600}
+  .empty{color:var(--muted);text-align:center;padding:40px 0}
+  footer{color:var(--muted);font-size:12px;text-align:center;margin-top:18px}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="tri">▲</span> Ocarina Songs</h1>
+  <div class="row">
+    <input id="q" type="search" placeholder="Search songs or places…" autocomplete="off">
+    <div class="seg" role="group" aria-label="Controller">
+      <button id="bx" class="on">Xbox</button>
+      <button id="bs">Switch</button>
+    </div>
+  </div>
+</header>
+<main id="list"></main>
+
+<script>
+// Inputs as listed for the remake (Switch-style letters). Xbox: A↔B, X↔Y, L→LB, R→RB.
+const SONGS = [
+  {g:"Main songs", n:"Zelda's Lullaby", i:"Y X A Y X A", get:"Meet Princess Zelda at Hyrule Castle.", does:"Solves Triforce-symbol puzzles and opens passages.", tags:"hyrule castle triforce"},
+  {g:"Main songs", n:"Epona's Song", i:"X Y A X Y A", get:"Talk to Malon in the Lon Lon Ranch horse pen.", does:"Calls Epona (once you have her as adult Link).", tags:"horse lon lon ranch malon"},
+  {g:"Main songs", n:"Saria's Song", i:"R A Y R A Y", get:"Saria in Sacred Forest Meadow, after meeting Zelda.", does:"Hints from Saria, cheers up Darunia, gets Mido to let you through.", tags:"lost woods darunia mido"},
+  {g:"Main songs", n:"Sun's Song", i:"A R X A R X", get:"Play Zelda's Lullaby at the Royal Family's Tomb, Kakariko Graveyard.", does:"Flips day and night; stuns Gibdos and ReDeads.", tags:"day night redead gibdo"},
+  {g:"Main songs", n:"Song of Time", i:"A L R A L R", get:"Return to Castle Town with all three Spiritual Stones and the Ocarina of Time.", does:"Opens the Door of Time; moves blue Song of Time blocks.", tags:"door of time master sword blocks"},
+  {g:"Main songs", n:"Song of Storms", i:"L R X L R X", get:"Adult Link: the man in the Kakariko windmill.", does:"Makes rain, drains the Kakariko well (play it in the windmill), reveals grottos.", tags:"rain windmill well grotto"},
+  {g:"Warp songs", n:"Minuet of Forest", i:"L X Y A Y A", get:"Adult Link: Sheik in Sacred Forest Meadow.", does:"Warps to Sacred Forest Meadow.", tags:"forest temple sacred grove meadow warp"},
+  {g:"Warp songs", n:"Bolero of Fire", i:"R L R L A R A R", get:"Adult Link: Sheik in Death Mountain Crater (Hookshot across the bridge).", does:"Warps to Death Mountain Crater.", tags:"fire temple death mountain crater warp"},
+  {g:"Warp songs", n:"Serenade of Water", i:"L R A A Y", get:"Sheik at the Ice Cavern, after getting the Iron Boots.", does:"Warps to Lake Hylia.", tags:"water temple lake hylia warp"},
+  {g:"Warp songs", n:"Nocturne of Shadow", i:"Y A A L Y A R", get:"Kakariko Village after the Forest, Fire and Water Temples.", does:"Warps to Kakariko Graveyard (upper area).", tags:"shadow temple kakariko graveyard warp"},
+  {g:"Warp songs", n:"Requiem of Spirit", i:"L R L A R L", get:"Sheik at Desert Colossus, after entering and leaving the Spirit Temple.", does:"Warps to Desert Colossus.", tags:"spirit temple desert colossus warp"},
+  {g:"Warp songs", n:"Prelude of Light", i:"X A X A Y X", get:"Sheik at the Master Sword pedestal, Temple of Time.", does:"Warps to the Temple of Time.", tags:"temple of time light master sword warp"}
+];
+const XBOX = {A:"B", B:"A", X:"Y", Y:"X", L:"LB", R:"RB"};
+
+let mode = "xbox";
+try { mode = localStorage.getItem("ocarina-mode") || "xbox"; } catch(e) {}
+
+const $ = s => document.querySelector(s);
+const list = $("#list"), q = $("#q");
+
+function keyHTML(k){
+  const out = mode === "xbox" ? XBOX[k] : k;
+  const bump = out.length > 1 || out === "L" || out === "R";
+  const cls = mode === "xbox" ? (bump ? "bump" : out) : (bump ? "bump" : "sw " + out);
+  return `<span class="k ${cls}">${out}</span>`;
+}
+
+function render(){
+  const term = q.value.trim().toLowerCase();
+  const hits = SONGS.filter(s => !term || (s.n + " " + s.tags + " " + s.does + " " + s.get).toLowerCase().includes(term));
+  if (!hits.length){ list.innerHTML = `<div class="empty">No songs match “${q.value.replace(/[<>&]/g,"")}”</div>`; return; }
+  let html = "", group = "";
+  for (const s of hits){
+    if (s.g !== group){ group = s.g; html += `<h2>${group}</h2>`; }
+    html += `<details class="song"${term ? " open" : ""}><summary>
+      <div class="name"><span>${s.n}</span><span class="chev">›</span></div>
+      <div class="keys">${s.i.split(" ").map(keyHTML).join("")}</div></summary>
+      <div class="info"><p><b>What it does:</b> ${s.does}</p><p><b>Where to learn it:</b> ${s.get}</p></div></details>`;
+  }
+  html += `<footer>Song list from Destructoid · Xbox layout swaps A↔B and X↔Y</footer>`;
+  list.innerHTML = html;
+}
+
+function setMode(m){
+  mode = m;
+  try { localStorage.setItem("ocarina-mode", m); } catch(e) {}
+  $("#bx").classList.toggle("on", m === "xbox");
+  $("#bs").classList.toggle("on", m === "switch");
+  render();
+}
+$("#bx").onclick = () => setMode("xbox");
+$("#bs").onclick = () => setMode("switch");
+q.addEventListener("input", render);
+setMode(mode);
+
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>
